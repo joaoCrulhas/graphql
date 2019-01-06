@@ -1,5 +1,8 @@
+/* eslint-disable no-use-before-define */
 /* eslint-disable no-param-reassign */
 /* eslint-disable no-underscore-dangle */
+/*  eslint-disable-next-line no-use-before-define */
+
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import Debug from 'debug';
@@ -22,6 +25,19 @@ import index from './routes/index';
 const ObjectId = require('mongoose').Types.ObjectId;
 
 const saltRounds = 12;
+
+const events = (async (eventsIDs) => {
+  const eventos = await EventModel.find({ _id: { $in: eventsIDs } });
+  console.log(eventos);
+});
+
+// eslint-disable-next-line no-return-await
+const user = (async userID => await UserModel.findById(userID, (err, doc) => {
+  if (err) throw (err);
+  doc.createEvent = events(doc.createdEvents);
+  return doc;
+}));
+
 
 ObjectId.prototype.valueOf = function () {
   return this.toString();
@@ -94,14 +110,13 @@ app.use('/graphql', expressGraphql({
   `),
   rootValue: {
     async events() {
-      const events = await EventModel.find().populate('creator');
-      events.map((event) => {
+      const getEvents = await EventModel.find().populate('creator');
+      return getEvents.map((event) => {
         const idString = event._id.toString();
         event._id = idString;
+        event.creator = user(event._doc.creator);
         return event;
       });
-      console.log(events);
-      return events;
     },
     createEvent(args) {
       const eventObj = new EventModel({
@@ -133,8 +148,8 @@ app.use('/graphql', expressGraphql({
       return users;
     },
     async createUser(args) {
-      const user = await UserModel.findOne({ email: args.userInput.email }, 'email');
-      if (typeof user.email === 'string') {
+      const userfind = await UserModel.findOne({ email: args.userInput.email }, 'email');
+      if (typeof userfind.email === 'string') {
         throw new Error('User already exist');
       }
 
