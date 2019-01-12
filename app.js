@@ -26,22 +26,29 @@ const ObjectId = require('mongoose').Types.ObjectId;
 
 const saltRounds = 12;
 
-const events = (async (eventsIDs) => {
-  const eventos = await EventModel.find({ _id: { $in: eventsIDs } });
-  console.log(eventos);
-});
-
-// eslint-disable-next-line no-return-await
-const user = (async userID => await UserModel.findById(userID, (err, doc) => {
-  if (err) throw (err);
-  doc.createEvent = events(doc.createdEvents);
-  return doc;
-}));
-
-
 ObjectId.prototype.valueOf = function () {
   return this.toString();
 };
+/*
+ * @desc - Return userByID
+ * @params - userID
+ * return - User Object
+*/
+const user = (async (userID) => {
+  const userModel = await UserModel.findById(userID, (err, doc) => {
+    if (err) return err;
+    return (doc);
+  });
+  userModel.createdEvents = events(userModel.createdEvents);
+
+  return (userModel);
+});
+
+const events = (async (eventsIDs) => {
+  const eventsDoc = await EventModel.find({ _id: { $in: eventsIDs } });
+  // console.log(eventsDoc);
+});
+
 
 const app = express();
 const debug = Debug('academind-graphql:app');
@@ -111,12 +118,19 @@ app.use('/graphql', expressGraphql({
   rootValue: {
     async events() {
       const getEvents = await EventModel.find().populate('creator');
-      return getEvents.map((event) => {
+      const eventsCreated = getEvents.map((event) => {
         const idString = event._id.toString();
         event._id = idString;
-        event.creator = user(event._doc.creator);
+        user(event.creator._id)
+          .then((doc) => {
+            event.creator = doc;
+            return doc;
+          })
+          .catch(error => error);
         return event;
       });
+      console.log(eventsCreated);
+      return eventsCreated;
     },
     createEvent(args) {
       const eventObj = new EventModel({
